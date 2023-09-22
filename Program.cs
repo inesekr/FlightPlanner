@@ -5,6 +5,8 @@ namespace FlightPlanner
 {
     public class Program
     {
+
+        // added this to test pushing to github
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
