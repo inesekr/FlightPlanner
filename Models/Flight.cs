@@ -9,6 +9,5 @@
         public string departureTime { get; set; }
         public string arrivalTime { get; set; }
 
-
     }
 }

@@ -1,9 +1,8 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using FlightPlanner.Models;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using FlightPlanner.Storage;
+using FlightPlanner.Exceptions;
 
 namespace FlightPlanner.Controllers
 {
@@ -13,6 +12,7 @@ namespace FlightPlanner.Controllers
     public class AdminApiController : ControllerBase
     {
         private readonly FlightStorage _storage;
+        private static readonly object _locker = new();
         public AdminApiController() 
         {
             _storage = new FlightStorage();
@@ -22,16 +22,60 @@ namespace FlightPlanner.Controllers
         [HttpGet]
         public IActionResult GetFlight(int id)
         {
-            return NotFound();
+            lock (_locker)
+            {
+                var flight = _storage.FindFlightById(id);
+                if (flight == null)
+                {
+                    return NotFound();
+                }
+                return Ok(flight);
+            }
         }
 
         [Route("flights")]
         [HttpPut]
-        public IActionResult PutFlight(Flight flight)
+        public IActionResult AddFlight(Flight flight)
         {
-            _storage.AddFlight(flight);
-            return Created("", flight);
+            lock(_locker)
+            {
+                try
+                {
+                    _storage.AddFlight(flight);
+                }
+                catch (SameAirportException)
+                {
+                    return BadRequest();
+                }
+                catch (WrongValuesException)
+                {
+                    return BadRequest();
+                }
+                catch (DuplicateFlightException)
+                {
+                    return Conflict();
+                }
+
+                return Created("", flight);
+            }
         }
 
+        [Route("flights/{id}")]
+        [HttpDelete]
+        public IActionResult DeleteFlight(int id)
+        {
+            lock (_locker)
+            {
+                try
+                {
+                    _storage.DeleteFlight(id);
+                }
+                catch (FlightNotFoundException)
+                {
+                    return Ok();
+                }
+                return Ok();
+            }
+        }
     }
 }
