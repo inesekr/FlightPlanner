@@ -1,38 +1,33 @@
 ﻿using FlightPlanner.Models;
 using FlightPlanner.Exceptions;
+using Microsoft.EntityFrameworkCore;
 
 namespace FlightPlanner.Storage
 {
     public class FlightStorage
     {
-        private static List<Flight> _flightStorage = new List<Flight>();
+        private readonly FlightPlannerDbContext _context;
+
+        public FlightStorage(FlightPlannerDbContext context)
+        {
+            _context = context;
+        }
         private static int _id = 0;
 
-       public Airport SearchAirports(string phrase)
+        public Airport SearchAirports(string phrase)
         {
-            phrase = phrase.Trim();
-            var matchingAirportTo = _flightStorage
-                .Select(flight => flight.To)
+            phrase = phrase.Trim().ToLower(); 
+            var matchingAirport = _context.Airports
                 .FirstOrDefault(airport =>
-             airport.AirportCode.Contains(phrase, StringComparison.OrdinalIgnoreCase) ||
-             airport.Country.Contains(phrase, StringComparison.OrdinalIgnoreCase) ||
-             airport.City.Contains(phrase, StringComparison.OrdinalIgnoreCase));
+                    airport.AirportCode.ToLower().Contains(phrase) ||
+                    airport.Country.ToLower().Contains(phrase) ||
+                    airport.City.ToLower().Contains(phrase));
 
-            var matchingAirportFrom = _flightStorage
-                .Select(flight => flight.From)
-                .FirstOrDefault(airport =>
-                    airport.AirportCode.Contains(phrase, StringComparison.OrdinalIgnoreCase) ||
-                    airport.Country.Contains(phrase, StringComparison.OrdinalIgnoreCase) ||
-                    airport.City.Contains(phrase, StringComparison.OrdinalIgnoreCase));
+            if (matchingAirport != null)
+            {
+                return matchingAirport;
+            }
 
-            if (matchingAirportTo != null)
-            {
-                return matchingAirportTo;
-            }
-            else if (matchingAirportFrom != null)
-            {
-                return matchingAirportFrom;
-            }
             else
             {
                 return null;
@@ -41,7 +36,7 @@ namespace FlightPlanner.Storage
                       
         public void AddFlight(Flight flight)
         {
-            if (_flightStorage.Any(f=> f.From.AirportCode == flight.From.AirportCode && 
+            if (_context.Flights.Any(f=> f.From.AirportCode == flight.From.AirportCode && 
                 f.To.AirportCode == flight.To.AirportCode &&
                 f.Carrier == flight.Carrier &&
                 f.departureTime == flight.departureTime &&
@@ -73,32 +68,32 @@ namespace FlightPlanner.Storage
                 throw new WrongValuesException(); 
             }
 
-            flight.Id = _id++;
-            _flightStorage.Add(flight);
+            _context.Flights.Add(flight);
+            _context.SaveChanges();
         }
 
-        public Flight FindFlightById(int id)
+       public Flight FindFlightById(int id)
         {
-            var flight = _flightStorage.FirstOrDefault(f => f.Id == id);
-            //if (flight==null)
-            //{
-            //    throw new FlightNotFoundException();
-            //}
+            var flight = _context.Flights
+                .Include(f => f.From)
+                .Include(f => f.To)
+                .SingleOrDefault(f => f.Id == id);
+
+            return flight;
+        }
+
+        public Flight GetFlight(int id)
+        {
+            var flight = _context.Flights
+              .Include(f => f.From)
+              .Include(f => f.To)
+              .SingleOrDefault(f => f.Id == id);
             return flight;
         }
 
         public List<Flight> SearchFlights(SearchFlightRequest request)
         {
-            //if (string.IsNullOrEmpty(request.From) || 
-            //    string.IsNullOrEmpty(request.To) || string.IsNullOrEmpty(request.DepartureDate))
-            //{
-            //    throw new WrongValuesException();
-            //}
-            //if (request.From.Trim().ToUpper() == request.To.Trim().ToUpper())
-            //{
-            //    throw new SameAirportException();
-            //}
-            var flights = _flightStorage.Where(f=> 
+            var flights = _context.Flights.Where(f=> 
                 f.From.AirportCode == request.From && 
                 f.To.AirportCode == request.To &&
                 f.departureTime.Contains(request.DepartureDate)).ToList();
@@ -108,7 +103,7 @@ namespace FlightPlanner.Storage
 
         public void DeleteFlight(int id)
         {
-            var flightToDelete = _flightStorage.FirstOrDefault(f => f.Id == id);
+            var flightToDelete = _context.Flights.FirstOrDefault(f => f.Id == id);
 
             if (flightToDelete == null)
             {
@@ -116,13 +111,16 @@ namespace FlightPlanner.Storage
             }
             else
             {
-                _flightStorage.Remove(flightToDelete);
+                _context.Flights.Remove(flightToDelete);
+                _context.SaveChanges();
             }
         }
 
         public void Clear()
         {
-            _flightStorage.Clear();
+            _context.Flights.RemoveRange(_context.Flights);
+            _context.Airports.RemoveRange(_context.Airports);
+            _context.SaveChanges();
         }
     }
 }

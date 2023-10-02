@@ -13,31 +13,30 @@ namespace FlightPlanner.Controllers
     {
         private readonly FlightStorage _storage;
         private static readonly object _locker = new();
-        public AdminApiController() 
+
+        public AdminApiController(FlightStorage storage)
         {
-            _storage = new FlightStorage();
+            _storage = storage;
         }
 
         [Route("flights/{id}")]
         [HttpGet]
         public IActionResult GetFlight(int id)
         {
-            lock (_locker)
+            var flight = _storage.GetFlight(id);
+            if (flight == null)
             {
-                var flight = _storage.FindFlightById(id);
-                if (flight == null)
-                {
-                    return NotFound();
-                }
-                return Ok(flight);
+                return NotFound();
             }
+
+            return Ok(flight);
         }
 
         [Route("flights")]
         [HttpPut]
-        public IActionResult AddFlight(Flight flight)
+        public IActionResult PutFlight(Flight flight)
         {
-            lock(_locker)
+            lock (_locker)
             {
                 try
                 {
@@ -74,6 +73,7 @@ namespace FlightPlanner.Controllers
                 {
                     return Ok();
                 }
+
                 return Ok();
             }
         }
