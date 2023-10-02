@@ -11,9 +11,9 @@ namespace FlightPlanner.Controllers
     {
         private readonly FlightStorage _storage;
 
-        public ApiController() 
+        public ApiController(FlightStorage storage) 
         {
-            _storage = new FlightStorage();
+            _storage = storage;
         }
 
         [Route("airports")]
