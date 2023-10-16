@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using FlightPlanner.Models;
-using FlightPlanner.Storage;
-using FlightPlanner.Exceptions;
+using FlightPlanner.Core.Models;
+using FlightPlanner.Core.Services;
+using AutoMapper;
+using FlightPlanner.Core.Interfaces;
 
 namespace FlightPlanner.Controllers
 {
@@ -11,52 +13,59 @@ namespace FlightPlanner.Controllers
     [ApiController]
     public class AdminApiController : ControllerBase
     {
-        private readonly FlightStorage _storage;
+        private readonly IFlightService _flightService;
+        private readonly IMapper _mapper;
+        private readonly IEnumerable<IValidate> _validators;
+        
         private static readonly object _locker = new();
-
-        public AdminApiController(FlightStorage storage)
+       
+        public AdminApiController(
+            IFlightService flightService,
+            IMapper mapper, 
+            IEnumerable<IValidate> validators)
         {
-            _storage = storage;
+            _flightService = flightService;
+            _mapper = mapper;
+            _validators = validators;
         }
 
         [Route("flights/{id}")]
         [HttpGet]
         public IActionResult GetFlight(int id)
         {
-            var flight = _storage.GetFlight(id);
+            var flight = _flightService.GetFullFlightById(id);
             if (flight == null)
             {
                 return NotFound();
             }
 
-            return Ok(flight);
+            return Ok(_mapper.Map<FlightRequest>(flight));
         }
 
         [Route("flights")]
         [HttpPut]
-        public IActionResult PutFlight(Flight flight)
+        public IActionResult PutFlight(FlightRequest request)
         {
             lock (_locker)
             {
-                try
-                {
-                    _storage.AddFlight(flight);
-                }
-                catch (SameAirportException)
+                var flight = _mapper.Map<Flight>(request);
+
+                if (!_validators.All(v => v.IsValid(flight)))
                 {
                     return BadRequest();
                 }
-                catch (WrongValuesException)
-                {
-                    return BadRequest();
-                }
-                catch (DuplicateFlightException)
+
+                if (_flightService.Exists(flight))
                 {
                     return Conflict();
                 }
 
-                return Created("", flight);
-            }
+                _flightService.Create(flight);
+
+                request = _mapper.Map<FlightRequest>(flight);
+
+                return Created("", request);
+            }   
         }
 
         [Route("flights/{id}")]
@@ -65,16 +74,17 @@ namespace FlightPlanner.Controllers
         {
             lock (_locker)
             {
-                try
-                {
-                    _storage.DeleteFlight(id);
-                }
-                catch (FlightNotFoundException)
+                var flightToDelete = _flightService.GetFullFlightById(id);
+                if (flightToDelete == null)
                 {
                     return Ok();
                 }
+                else
+                {
+                    _flightService.Delete(flightToDelete);
 
-                return Ok();
+                    return Ok();
+                }
             }
         }
     }
