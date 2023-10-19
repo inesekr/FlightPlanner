@@ -1,6 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using FlightPlanner.Core.Services;
 using Microsoft.AspNetCore.Mvc;
-using FlightPlanner.Storage;
 
 namespace FlightPlanner.Controllers
 {
@@ -8,16 +7,18 @@ namespace FlightPlanner.Controllers
     [ApiController]
     public class CleanupApiController : ControllerBase
     {
-        private readonly FlightStorage _storage;
-        public CleanupApiController()
+        private readonly ICleanupService _cleanupService;
+        public CleanupApiController(ICleanupService cleanupService)
         {
-            _storage = new FlightStorage();
+            _cleanupService = cleanupService;
         }
+
         [Route("clear")]
         [HttpPost]
         public IActionResult Clear()
         {
-            _storage.Clear();
+            _cleanupService.CleanDatabase();
+            
             return Ok();
         }
     }

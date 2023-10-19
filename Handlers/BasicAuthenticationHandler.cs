@@ -26,6 +26,7 @@ namespace FlightPlanner.Handlers
 
             bool authorized = false;
             string username;
+
             try
             {
                 var authHeader = AuthenticationHeaderValue.Parse(Request.Headers["Authorization"]);
@@ -37,7 +38,6 @@ namespace FlightPlanner.Handlers
                 {
                     authorized = true;
                 }
-               
             }
             catch
             {
@@ -56,7 +56,6 @@ namespace FlightPlanner.Handlers
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
             return AuthenticateResult.Success(ticket);
-            //throw new NotImplementedException();
         }
     }
 }
